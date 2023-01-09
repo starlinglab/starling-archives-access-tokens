@@ -20,7 +20,7 @@ contract starling is ERC721URIStorage {
 
     }
 
-    function generateCharacter(uint256 tokenId) public view returns  (string memory) {
+    function generateImg(uint256 tokenId) private view rurns  (string memory) {
         bytes memory svg = abi.encodePacked(
         '<svg xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMinYMin meet" viewBox="0 0 350 350">',
         '<style>.base { fill: white; font-family: serif; font-size: 14px; }</style>',
@@ -40,18 +40,18 @@ contract starling is ERC721URIStorage {
     function getCollection(uint256 tokenId) public view returns (string memory){
         return tokenIdtoCollection[tokenId];
     }
-    function getAcessCondition(uint256 tokenId) public view returns (string memory){
+    function getAccessCondition(uint256 tokenId) public view returns (string memory){
         return tokenIdtoAccessCondition[tokenId];
     }
     function getLITKey(uint256 tokenId) public view returns (string memory){
         return tokenIdtoLITkey[tokenId];
     }
-    function getTokenURI(uint256 tokenId) public returns (string memory){
+    function getTokenURI(uint256 tokenId) public view returns (string memory) {
         bytes memory dataURI = abi.encodePacked(
             '{',
                 '"name": "Starling Access Token Test #', tokenId.toString(), '",',
-                '"description": "Starling Lab Test NFT",',
-                '"image": "', generateCharacter(tokenId), '"',
+                '"description": "Collection ', tokenIdtoCollection[tokenId] , '",',
+                '"image_data": "', generateImg(tokenId), '"',
             '}'
         );
         return string(
@@ -78,5 +78,8 @@ contract starling is ERC721URIStorage {
         tokenIdtoLITkey[tokenId] = LitKey;
         tokenIdtoAccessCondition [tokenId] = AccessCondition;
         _setTokenURI(tokenId, getTokenURI(tokenId));
+    }
+    function tokenCount() public view returns (uint256) {
+        return _tokenIds.current();
     }
 }
