@@ -20,7 +20,7 @@ contract starling is ERC721URIStorage {
 
     }
 
-    function generateImg(uint256 tokenId) private view rurns  (string memory) {
+    function generateImg(uint256 tokenId) private view returns  (string memory) {
         bytes memory svg = abi.encodePacked(
         '<svg xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMinYMin meet" viewBox="0 0 350 350">',
         '<style>.base { fill: white; font-family: serif; font-size: 14px; }</style>',
@@ -49,8 +49,8 @@ contract starling is ERC721URIStorage {
     function getTokenURI(uint256 tokenId) public view returns (string memory) {
         bytes memory dataURI = abi.encodePacked(
             '{',
-                '"name": "Starling Access Token Test #', tokenId.toString(), '",',
-                '"description": "Collection ', tokenIdtoCollection[tokenId] , '",',
+                '"name": "Starling Access Token for', tokenIdtoCollection[tokenId] , '",',
+                '"description": "Token # ', tokenId.toString() , '",',
                 '"image_data": "', generateImg(tokenId), '"',
             '}'
         );
@@ -61,6 +61,7 @@ contract starling is ERC721URIStorage {
             )
         );
     }
+    event Minted(address owner, uint256 _tokenId);
     function mint() public {
         _tokenIds.increment();
         uint256 newItemId = _tokenIds.current();
@@ -70,6 +71,7 @@ contract starling is ERC721URIStorage {
         tokenIdtoAccessCondition[newItemId] = "";
         tokenIdtoCreator[newItemId] = msg.sender;
         _setTokenURI(newItemId, getTokenURI(newItemId));
+        emit Minted(msg.sender, newItemId);
     }
     function initializeLIT(uint256 tokenId, string memory CollectionName, string memory LitKey, string memory AccessCondition) public {
         require(_exists(tokenId), "Token not found");
