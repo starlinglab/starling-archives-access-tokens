@@ -1,0 +1,355 @@
+<html>
+
+<body>
+    <style>
+        .dialog b {
+            width: 200px;
+            display: inline-block;
+        }
+
+        .dialog i {
+            display: block;
+            margin-bottom: -12px;
+            color: #999999;
+            font-family: arial;
+            font-size: 10px;
+        }
+    </style>
+    <input type="button" value="Connect Metamask Using Lit" onclick="getAuthSign()" /><br>
+    <br>
+    <img id="test" width="256" align="left" src="about:blank" style="margin:8px; margin-bottom:10px;">
+    <span class="dialog">
+        <div style="border:1px solid black; background: #eeeeee; padding:2px;">
+            <b>Chain:</b> <input id="chain" value="mumbai"><br />
+            <i>Chain that contains the contract</i><br>
+
+            <b>Contract:</b> <input id="contract" value="0xdeF3E455c06D9077D1890564fC4d9d3A3145E145"
+                style="width:320px"><br />
+            <i>Address of contract</i><br>
+
+            <b>Token Type:</b> <input id="type" value="ERC1155"><br />
+            <i>Type of contract</i><br>
+
+            <input type="button" value="Mint new Token" id="MintToken" onclick="MintToken()">
+            <input type="button" value="Mint More" id="MintMore" disabled="true" onclick="MintMoreTokens()">
+            <i>Mint a new uninitialized token and place it in your wallet. Check the resulting transaction for the new tokenID</i><br>
+
+            <hr>
+            <b>Token ID:</b> <input id="tokenId" value=""><br />
+            <i>Token Id in the contract</i><br>
+
+            <input type="button" value="Read Token" onclick="ReadNFT()">
+            <i>Read the contents of the token from the blockchian. Will unlock other buttons below if you are the owner
+                or creator</i><br>
+
+            <span id="TokenStatus">Token Access:</span><br>
+            <i>Tells you what access you have to this token. Creator is the only one that can initalize a token. Owner is the only one that can use it</i><br>
+        </div>
+        <hr>
+        <div style="border:1px solid black; background: #eeffee; padding:2px;">
+
+            <b>Archive Name:</b> <input id="archiveName" value="" /><br>
+            <i>Name of archive</i><br>
+
+            <b>Archive Description:</b> <input id="archiveDescription" value="" /><br>
+            <i>Short description of the archive</i><br>
+
+            <b>Archive URI:</b> <input id="archiveURI" value="" /><br>
+            <i>URI to the encrypted archive</i><br>
+
+            <b>Custom Image URI:</b> <input id="imageURI" value="" /><br>
+            <i>Short descrption of the file</i><br>
+            archiveOrganization
+            <b>Organization:</b> <input id="archiveOrganization" value="" /> <b>Collection:</b> <input id="archiveCollection" value="" /><br>
+            <i>Organization and Collection</i><br>
+            <br>
+        </div>
+        <input type="button" value="Write Token Data to NFT" id="InitToken" onclick="InitToken()" disabled="true">
+
+        <hr>
+        <div style="border:1px solid black; background: #ffeeee; padding:2px;">
+
+            <b>Encryption Key:</b> <input id="key" type="password" style="width:320px" /><br>
+            <i>16 Hex characters representing the encryption key that you wish to save on LIT</i><br>
+
+            <b>Lit Key:</b><input id="litKey" style="width:320px"><br />
+            <i>Result of Make Lit Data. Lit encrypted encryption Key</i><br>
+            <b>Access Conditions:</b><input id='accessConditions' value='' style="width:320px"><br>
+            <i>Result of Make Lit Data. Condition string required to decrypt the token.</i><br>
+        </div>
+
+        <script onload="LitJsSdk.litJsSdkLoadedInALIT()" src="https://jscdn.litgateway.com/index.web.js"></script>
+        <script src="https://cdn.ethers.io/lib/ethers-5.2.umd.min.js" type="application/javascript"></script>
+        <script>
+            function chain() {
+                return document.getElementById("chain").value;
+            }
+            function getAccessCondition() {
+                contract = document.getElementById("contract").value;
+                type = document.getElementById("type").value;
+                tokenId = document.getElementById("tokenId").value;
+
+                const accessControlConditions =
+                    [
+                        {
+                            "contractAddress": contract,
+                            "standardContractType": type,
+                            "chain": chain(),
+                            "method": "balanceOf",
+                            "parameters": [
+                                ":userAddress",
+                                tokenId
+                            ],
+                            "returnValueTest": {
+                                "comparator": ">=",
+                                "value": "1"
+                            }
+                        }
+                    ];
+                return accessControlConditions;
+
+            }
+            async function litJsSdkLoaded() {
+                var litNodeClient = new LitJsSdk.LitNodeClient();
+                await litNodeClient.connect();
+                window.litNodeClient = litNodeClient;
+            }
+            async function getAuthSign() {
+                var authSig = await LitJsSdk.checkAndSignAuthMessage({
+                    chain: chain(),
+                });
+                return authSig;
+            }
+
+            async function saveKeyInLit(accessControlConditions, exportedSymmKey) {
+                var authSig = await getAuthSign();
+
+                var resKey = await litNodeClient.saveEncryptionKey({
+                    accessControlConditions: getAccessCondition(),
+                    symmetricKey: exportedSymmKey,
+                    authSig: authSig,
+                    chain: chain()
+                });
+                return LitJsSdk.uint8arrayToString(resKey, "base16");
+            }
+            async function SaveLit() {
+
+                key = document.getElementById("key").value;
+                exportedSymmKey = LitJsSdk.uint8arrayFromString(key, "base16");
+
+                await litJsSdkLoaded();
+                litKey = await saveKeyInLit(getAccessCondition(), exportedSymmKey);
+                document.getElementById("accessConditions").value = JSON.stringify(getAccessCondition());
+                document.getElementById("litKey").value = litKey;
+            }
+
+            async function VerifyLit() {
+                await litJsSdkLoaded();
+
+                litKey = document.getElementById("litKey").value
+                var unlockedKey = await litNodeClient.getEncryptionKey({
+                    accessControlConditions: getAccessCondition(),
+                    toDecrypt: litKey,
+                    authSig: await getAuthSign(),
+                    chain: chain(),
+                });
+
+                exportedSymmKey = LitJsSdk.uint8arrayToString(unlockedKey, "base16");
+
+                if (document.getElementById("key").value == exportedSymmKey) {
+                    alert("Confirmed!")
+                } else {
+                    alert("ERROR")
+                }
+
+
+            }
+
+            const contractAbi = [{"inputs":[],"stateMutability":"nonpayable","type":"constructor"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"account","type":"address"},{"indexed":true,"internalType":"address","name":"operator","type":"address"},{"indexed":false,"internalType":"bool","name":"approved","type":"bool"}],"name":"ApprovalForAll","type":"event"},{"anonymous":false,"inputs":[{"indexed":false,"internalType":"uint256","name":"_tokenId","type":"uint256"}],"name":"MetadataUpdate","type":"event"},{"anonymous":false,"inputs":[{"indexed":false,"internalType":"address","name":"owner","type":"address"},{"indexed":false,"internalType":"uint256","name":"_tokenId","type":"uint256"}],"name":"Minted","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"operator","type":"address"},{"indexed":true,"internalType":"address","name":"from","type":"address"},{"indexed":true,"internalType":"address","name":"to","type":"address"},{"indexed":false,"internalType":"uint256[]","name":"ids","type":"uint256[]"},{"indexed":false,"internalType":"uint256[]","name":"values","type":"uint256[]"}],"name":"TransferBatch","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"operator","type":"address"},{"indexed":true,"internalType":"address","name":"from","type":"address"},{"indexed":true,"internalType":"address","name":"to","type":"address"},{"indexed":false,"internalType":"uint256","name":"id","type":"uint256"},{"indexed":false,"internalType":"uint256","name":"value","type":"uint256"}],"name":"TransferSingle","type":"event"},{"anonymous":false,"inputs":[{"indexed":false,"internalType":"string","name":"value","type":"string"},{"indexed":true,"internalType":"uint256","name":"id","type":"uint256"}],"name":"URI","type":"event"},{"inputs":[{"internalType":"address","name":"account","type":"address"},{"internalType":"uint256","name":"id","type":"uint256"}],"name":"balanceOf","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address[]","name":"accounts","type":"address[]"},{"internalType":"uint256[]","name":"ids","type":"uint256[]"}],"name":"balanceOfBatch","outputs":[{"internalType":"uint256[]","name":"","type":"uint256[]"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address","name":"owner","type":"address"},{"internalType":"uint256","name":"_tokenId","type":"uint256"}],"name":"burnToken","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"uint256","name":"tokenId","type":"uint256"}],"name":"getTokenURI","outputs":[{"internalType":"string","name":"","type":"string"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address","name":"account","type":"address"},{"internalType":"address","name":"operator","type":"address"}],"name":"isApprovedForAll","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"uint256","name":"amount","type":"uint256"}],"name":"mint","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"uint256","name":"_tokenId","type":"uint256"},{"internalType":"uint256","name":"amount","type":"uint256"}],"name":"mintAdditional","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[],"name":"name","outputs":[{"internalType":"string","name":"","type":"string"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address","name":"from","type":"address"},{"internalType":"address","name":"to","type":"address"},{"internalType":"uint256[]","name":"ids","type":"uint256[]"},{"internalType":"uint256[]","name":"amounts","type":"uint256[]"},{"internalType":"bytes","name":"data","type":"bytes"}],"name":"safeBatchTransferFrom","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"address","name":"from","type":"address"},{"internalType":"address","name":"to","type":"address"},{"internalType":"uint256","name":"id","type":"uint256"},{"internalType":"uint256","name":"amount","type":"uint256"},{"internalType":"bytes","name":"data","type":"bytes"}],"name":"safeTransferFrom","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"address","name":"operator","type":"address"},{"internalType":"bool","name":"approved","type":"bool"}],"name":"setApprovalForAll","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"uint256","name":"tokenId","type":"uint256"},{"internalType":"string","name":"url","type":"string"}],"name":"setExternalUrl","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"bytes4","name":"interfaceId","type":"bytes4"}],"name":"supportsInterface","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"tokenCount","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"uint256","name":"","type":"uint256"}],"name":"tokenIdImageUri","outputs":[{"internalType":"string","name":"","type":"string"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"uint256","name":"","type":"uint256"}],"name":"tokenIdtoArchiveDescription","outputs":[{"internalType":"string","name":"","type":"string"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"uint256","name":"","type":"uint256"}],"name":"tokenIdtoArchiveName","outputs":[{"internalType":"string","name":"","type":"string"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"uint256","name":"","type":"uint256"}],"name":"tokenIdtoArchiveURI","outputs":[{"internalType":"string","name":"","type":"string"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"uint256","name":"","type":"uint256"}],"name":"tokenIdtoCollection","outputs":[{"internalType":"string","name":"","type":"string"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"uint256","name":"","type":"uint256"}],"name":"tokenIdtoCreator","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"uint256","name":"","type":"uint256"}],"name":"tokenIdtoExternalUrl","outputs":[{"internalType":"string","name":"","type":"string"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"uint256","name":"","type":"uint256"}],"name":"tokenIdtoLITAccessCondition","outputs":[{"internalType":"string","name":"","type":"string"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"uint256","name":"","type":"uint256"}],"name":"tokenIdtoLITkey","outputs":[{"internalType":"string","name":"","type":"string"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"uint256","name":"","type":"uint256"}],"name":"tokenIdtoOrganization","outputs":[{"internalType":"string","name":"","type":"string"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"uint256","name":"tokenId","type":"uint256"},{"internalType":"string","name":"litKey","type":"string"},{"internalType":"string","name":"litAccessCondition","type":"string"}],"name":"updateLIT","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"uint256","name":"tokenId","type":"uint256"},{"internalType":"string","name":"archiveName","type":"string"},{"internalType":"string","name":"archiveDescription","type":"string"},{"internalType":"string","name":"archiveURI","type":"string"},{"internalType":"string","name":"imageURI","type":"string"},{"internalType":"string","name":"organization","type":"string"},{"internalType":"string","name":"collection","type":"string"}],"name":"updateToken","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"uint256","name":"tokenId","type":"uint256"}],"name":"uri","outputs":[{"internalType":"string","name":"","type":"string"}],"stateMutability":"view","type":"function"}]
+
+            async function MintMoreTokens(){
+                const tokenId = document.getElementById("tokenId").value;
+                const provider = new ethers.providers.Web3Provider(window.ethereum);
+                const signer = provider.getSigner();
+                const address = document.getElementById("contract").value;
+                const contract = new ethers.Contract(address, contractAbi, signer);
+                result = await contract.mintAdditional(tokenId,1);
+            }
+            async function MintToken() {
+                const provider = new ethers.providers.Web3Provider(window.ethereum);
+                const signer = provider.getSigner();
+                const address = document.getElementById("contract").value;
+                const contract = new ethers.Contract(address, contractAbi, signer);
+                contract.on("Minted", (address, tokenId) => {
+                    ethereum.request({ method: 'eth_requestAccounts' }).then((accounts) => {
+                        account = accounts[0].toString().toUpperCase()
+                        owner =address.toString().toUpperCase()
+                        if (account == owner) {
+                            document.getElementById("tokenId").value = tokenId;
+                            alert("New token minted #" + tokenId);
+                            ReadNFT();
+                        } else {
+                            console.log("Not the one " + owner)
+                        }
+                    });
+                });
+                result = await contract.mint(1);
+                console.log(result);
+
+            }
+            async function ReadNFT() {
+                const provider = new ethers.providers.Web3Provider(window.ethereum);
+                const signer = provider.getSigner();
+                const address = document.getElementById("contract").value;
+                const contract = new ethers.Contract(address, contractAbi, signer);
+                const tokenId = document.getElementById("tokenId").value;
+
+
+
+                const accounts = await ethereum.request({ method: 'eth_requestAccounts' });
+                account = accounts[0]
+                accountUC = accounts[0].toString().toUpperCase();
+
+                owner = (await contract.balanceOf(account,tokenId));
+                creator = (await contract.tokenIdtoCreator(tokenId)).toString().toUpperCase();
+
+                document.getElementById("MintMore").disabled = 
+                document.getElementById("transfer").disabled=
+                document.getElementById("InitLit").disabled = 
+                document.getElementById("VerifyLit").disabled= 
+                document.getElementById("InitToken").disabled = 
+                document.getElementById("SaveLit").disabled = 
+                document.getElementById("setUrl").disabled=true;
+
+                v = "Token Access: "
+                if (creator == accountUC) {
+                    document.getElementById("InitLit").disabled = false;
+                    document.getElementById("InitToken").disabled = false;
+                    document.getElementById("SaveLit").disabled = false;
+                    document.getElementById("MintMore").disabled = false;
+                document.getElementById("setUrl").disabled=false;
+
+                    v = v + " [Creator] ";
+                }
+                if (owner > 0 ) {
+                    v = v + " [ Owner] ";
+                    document.getElementById("VerifyLit").disabled = false;
+                    document.getElementById("transfer").disabled = false;
+                    const accounts = await ethereum.request({ method: 'eth_requestAccounts' });
+                    document.getElementById("from").value=accounts[0].toString();
+
+                }
+                document.getElementById("TokenStatus").innerHTML = v;
+
+
+                document.getElementById("litKey").value = await contract.tokenIdtoLITkey(tokenId);
+                document.getElementById("archiveDescription").value = await contract.tokenIdtoArchiveDescription(tokenId);
+                document.getElementById("archiveName").value = await contract.tokenIdtoArchiveName(tokenId);
+                document.getElementById("archiveOrganization").value = await contract.tokenIdtoOrganization(tokenId);
+                document.getElementById("archiveCollection").value = await contract.tokenIdtoCollection(tokenId);
+                document.getElementById("archiveURI").value = await contract.tokenIdtoArchiveURI(tokenId);
+                document.getElementById("accessConditions").value = await contract.tokenIdtoLITAccessCondition(tokenId);
+
+                // Get image
+                res = await contract.getTokenURI(tokenId);
+                const json = atob(res.substring(29));
+                const result = JSON.parse(json);
+                if (result.image_data) {
+                    document.getElementById("test").src = result.image_data;
+                } else {
+                    document.getElementById("test").src = result.image;
+                    document.getElementById("imageURI").value  = result.image;
+                }
+
+
+            }
+
+
+            async function setURL() {
+
+                const provider = new ethers.providers.Web3Provider(window.ethereum);
+                const signer = provider.getSigner();
+                const address = document.getElementById("contract").value;
+                const tokenId = document.getElementById("tokenId").value;
+                const url  = document.getElementById("external_url").value;
+                const contract = new ethers.Contract(address, contractAbi, signer);
+
+                const daiWithSigner = contract.connect(signer);
+                tx = await daiWithSigner.setExternalUrl(tokenId, url);
+
+            }
+            async function getContract() {
+                const provider = new ethers.providers.Web3Provider(window.ethereum);
+                const signer = provider.getSigner();
+                const address = document.getElementById("contract").value;
+                const contract = new ethers.Contract(address, contractAbi, signer);
+                return contract;
+            }
+
+            const txtArchiveDescription = document.getElementById("archiveDescription");
+            const txtArchiveName = document.getElementById("archiveName");
+            const txtArchiveCollection = document.getElementById("archiveCollection");
+            const txtArchiveOrganization = document.getElementById("archiveOrganization");
+            const txtArchiveURI = document.getElementById("archiveURI");
+            const txtImageURI = document.getElementById("imageURI");
+            const txtLitKey = document.getElementById("litKey");
+            const txtTokenId = document.getElementById("tokenId");
+            const txtAccessCondition = document.getElementById("accessConditions")
+
+        
+            async function InitToken() {
+                const contract = await getContract();
+                console.log(contract);
+                const tokenId = txtTokenId.value;
+
+                let tx = await contract.updateToken(tokenId, txtArchiveName.value, txtArchiveDescription.value, txtArchiveURI.value,txtImageURI.value, txtArchiveOrganization.value,txtArchiveCollection.value);
+            }
+            async function InitLit() {
+                const contract = await getContract();
+                const tokenId = txtTokenId.value;
+
+                litKey = txtLitKey.value;
+                accessCondition = txtAccessCondition.value;
+
+                let tx = await contract.updateLIT(tokenId, litKey, accessCondition);
+            }
+            async function transfer() {
+                const provider = new ethers.providers.Web3Provider(window.ethereum);
+                const signer = provider.getSigner();
+                const address = document.getElementById("contract").value;
+                const contract = new ethers.Contract(address, contractAbi, signer);
+                tokenId = document.getElementById("tokenId").value;
+                from = document.getElementById("from").value;
+                to = document.getElementById("to").value;
+                //res = await contract["safeTransferFrom(address,address,uint256)"](from, to, tokenId);
+                res = await contract.safeTransferFrom(from, to, tokenId,1,"0x00");
+                console.log(res);
+            }
+        </script>
+        <input type="button" value="Make Lit Data" id="SaveLit" onclick="SaveLit()" disabled="true">
+        <input type="button" value="Verify Lit Data" id="VerifyLit" onclick="VerifyLit()" disabled="true">
+        <input type="button" value="Write Lit Data to NFT" id="InitLit" onclick="InitLit()" disabled="true">
+        <i>Make Lit Data - Stores encryption key on LIT network, computing an Access Condition to give this token access to
+            decrypt it. Requires Owner or Creator<br>
+            Verify Lit Data - Queries LIT using the Lit Key and Access Conditions, the matches result with Private Key
+            to make sure its resolves correctly Requires Owner<br>
+            Write Lit Data to NFT - Initalizes the NFT token storing Collection Name, Lit Key and Access Conditions to
+            it on chain. Requires Owner or Creator.
+    </span>
+    <br>
+    <hr/>
+    <span class="dialog">
+        <b>Set URL</b><br>
+        URL:<input id="external_url" value="https://ipfs.io/ipns/archiveexplorer.starlinglab.org?contract=&id=" style="width:400px">
+        <input value="Set" type="button" id="setUrl" disabled="true" onclick="setURL()">
+    </span>
+<hr>
+    <span class="dialog">
+        <b>Transfer</b><br>
+        From:<input id="from">
+        To:<input id="to">
+        <input value="Transfer Token" type="button" id="transfer" disabled="true" onclick="transfer()">
+    </span>
+</body>
+
+</html>
