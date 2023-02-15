@@ -28,7 +28,7 @@ contract starling is ERC1155URIStorage {
     mapping(uint256 => address) public tokenIdtoCreator;
     mapping(uint256 => uint256) public tokenSupply;
 
-    string public name = "Access Token (BETA)";
+    string public name = "Starling Archives Access Tokens";
     string public contract_version = "1";
     constructor() ERC1155(""){
     }
